@@ -13,6 +13,69 @@ const __dirname = dirname(import.meta);
 
 var db = null;
 
+var dbVersion = 2;
+
+
+async function createTableForClient(client)
+{
+    const create_table = eryn.render('db/create.eryn', {
+        table_name: client
+    }).toString('utf8');
+
+    await db.exec(create_table);
+}
+
+async function migrate(dbVersion)
+{
+    try
+    {
+        for (const client of Object.keys(config.getClients())) {
+            try {
+                data[client] = await db.get(`SELECT * FROM data_${client}`);
+
+                if (data[client] && Array.isArray(data[client])) {
+                    for(let i = 0; i < data[client].length; i++)
+                    {
+
+                    }
+                }
+            } catch (ex) {
+                throw `Failed to migrate db for client '${client}': ${ex}`;
+            }
+        }
+
+        await db.exec(`UPDATE metadata SET value=? WHERE key='db_version'`, dbVersion + 1);
+    }
+    catch (ex)
+    {
+        throw `Failed to migrate from ${dbVersion}: ${ex}`;
+    }
+}
+
+async function migrateIfNecessary()
+{
+    try
+    {
+        const data = await db.get(`SELECT value FROM metadata WHERE key='db_version'`);
+
+        let currentDbVersion;
+        if(data && data.value)
+            currentDbVersion = data.value;
+        else
+            currentDbVersion = 1;
+
+        while(currentDbVersion < dbVersion)
+        {
+            migrate(currentDbVersion);
+            currentDbVersion++;
+        }
+    }
+    catch (ex)
+    {
+        throw `Failed to retrieve db_version from metadata: ${ex}`;
+    }
+}
+
 export default {
     init: async () => {
         // Relative to config.json
@@ -35,18 +98,14 @@ export default {
                     throw `Client id '${client}' is invalid; must only contain a-zA-Z\n`;
                 }
 
-                const create_table = eryn.render('db/create.eryn', {
-                    table_name: client
-                }).toString('utf8');
-
-                await db.exec(create_table);
+                await createTableForClient(client);
             }
-
-            return;
         } catch(ex) {
             await db.close();
             throw `Failed to create database tables; file 'db/create.eryn' is missing or contains an invalid query\n${ex}`;
         }
+
+        await migrateIfNecessary();
     },
     uninit: async () => {
         if (db !== null) {

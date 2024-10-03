@@ -1,4 +1,13 @@
 CREATE TABLE IF NOT EXISTS data_[|context.table_name|] (
-    date TEXT CONSTRAINT pk_date PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    beginTimestamp INTEGER NOT NULL,
+    endTimestamp INTEGER NOT NULL,
     activity TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+INSERT INTO metadata VALUES ('db_version', 1);
